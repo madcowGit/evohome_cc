@@ -26,7 +26,7 @@ REFRESH_BREAKS_IN_HA_VERSION: Final = "2027.1.0"
 RESET_BREAKS_IN_HA_VERSION: Final = "2026.11.0"
 # Support for untargeted service calls to controllers is being deprecated
 SERVICE_BREAKS_IN_HA_VERSION: Final = "2026.11.0"
-#add bogus comment to allow workflow to rum
+
 
 @unique
 class EvoService(StrEnum):

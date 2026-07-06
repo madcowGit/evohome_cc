@@ -29,6 +29,12 @@ evohome_cc1:
     location_idx: 1
 ```
 
+## License
+
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
+
+This is a derivative work of the Home Assistant evohome integration, which is also licensed under the Apache License 2.0. For more information about the original Home Assistant project, visit: https://github.com/home-assistant/core
+
 ## Acknowledgements
 - original evohome integration and script to create additional custom_components: https://gist.github.com/zxdavb/d898e594091753d703c858c9accc59d2
 - manual steps to create additional integration are outlined here: https://github.com/zxdavb/evohome-async/wiki/Hass:-Multiple-Evohome-Locations

@@ -1,0 +1,157 @@
+name: Forced manual sync evohome from HA Core
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-evohome-from-ha-core-forced
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1) Checkout THIS repo (yours), full history for reliable diffs/commits
+      - name: Checkout this repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      # 2) Checkout ONLY the evohome directory from HA Core with sparse checkout
+      - name: Checkout home-assistant/core (sparse)
+        uses: actions/checkout@v4
+        with:
+          repository: home-assistant/core
+          path: _ha_core
+          fetch-depth: 1
+          sparse-checkout: |
+            homeassistant/components/evohome
+          sparse-checkout-cone-mode: true
+
+      # 3) Sync files into your repo under ha_evohome_original/evohome/
+      #    Using rsync with --delete so removed upstream files are removed here too.
+      - name: Sync evohome folder into this repo
+        run: |
+          set -euxo pipefail
+          # Based on the description here:
+          #  https://github.com/zxdavb/evohome-async/wiki/Hass:-Multiple-Evohome-Locations      
+          # This script is tested on Home Assistant OS.
+          # The script should be placed in this location: /config/custom_components/ and run from there.
+          # Run the script once every time you have updated the HA core.
+          #
+          # How many extra copies of the integration do you want?
+          INSTANCES=1      
+          #
+          # List current folder contents & goto custom components folder         
+          ls -al
+          mkdir -p ./custom_components
+          ls -al ./custom_components          
+                      
+          # Delete all old evohome folders
+          echo "Removing all evohome_x folders..."
+          rm -rf custom_components/evohome_cc*
+                    
+          # Create all new evohome instances
+          for i in $(seq $INSTANCES)
+          do
+            echo "Creating evohome_cc$i/" 
+           
+            # Copy the evohome folder
+            mkdir -p custom_components/evohome_cc$i
+            rsync -a --delete "_ha_core/homeassistant/components/evohome/" "custom_components/evohome_cc$i"
+          
+            echo "Updating files in evohome_cc$i/"
+            cd custom_components/evohome_cc$i/
+            # Update the files within the integration with proper values
+            sed -i "/domain/ s/evohome/evohome_cc$i/" manifest.json
+            sed -i "s/\"name\": *\"[^\"]*\"/\"name\": \"evohome_cc${i} (custom_component)\"/" manifest.json
+            sed -i 's#"documentation": *"[^"]*"#"documentation": "https://github.com/madcowGit/evohome_cc1"#' manifest.json
+            
+            sed -i '/"codeowners":/{
+              s/\]/, "@madcowGit"\]/
+              s/, "@madcowGit", "@madcowGit"/, "@madcowGit"/
+            }' manifest.json
+            
+            sed -i '/{/a \ \ "version": "0.0.1",'     manifest.json
+            sed -i "/DOMAIN/ s/evohome/evohome_cc$i/" const.py
+            
+            
+            # make manifest.json alphabetically
+            tmp=$(mktemp)
+            jq -S '.' manifest.json > "$tmp" && mv "$tmp" manifest.json
+
+            cd - >/dev/null
+          done
+
+      - name: Identify upstream HA Core commit for traceability
+        id: ha
+        run: |
+          set -euxo pipefail
+          HA_SHA=$(git -C _ha_core rev-parse --short HEAD || echo "unknown")
+          HA_BRANCH=$(git -C _ha_core rev-parse --abbrev-ref HEAD || echo "unknown")
+          echo "HA_SHA=$HA_SHA" >> "$GITHUB_OUTPUT"
+          echo "HA_BRANCH=$HA_BRANCH" >> "$GITHUB_OUTPUT"
+
+      # 5) Commit & push even if there are no changes (force an empty commit when needed)
+      - name: Commit and push (forced)
+        run: |
+          set -euxo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add custom_components || true
+          git commit --allow-empty -m "chore(sync): evohome from home-assistant/core@${{ steps.ha.outputs.HA_SHA }} (${ {{} } }${{ steps.ha.outputs.HA_BRANCH }}) [forced sync] [skip ci]" || true
+          git push || true
+
+      - name: Get latest release
+        id: latest
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const latest = await github.rest.repos.getLatestRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            }).catch(() => null);
+
+            if (!latest) {
+              // No release exists—start at v0.0.0
+              core.setOutput("latest_tag", "v0.0.0");
+            } else {
+              core.setOutput("latest_tag", latest.data.tag_name);
+            }
+
+      - name: Calculate next patch version
+        id: bump
+        run: |
+          TAG="${{ steps.latest.outputs.latest_tag }}"
+          echo "Latest tag: $TAG"
+
+          # Remove leading "v"
+          VERSION="${TAG#v}"
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+          # Increment PATCH only
+          PATCH=$((PATCH + 1))
+
+          NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "New version: $NEW_TAG"
+          echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release (forced sync note)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.bump.outputs.tag }}
+          name: Release ${{ steps.bump.outputs.tag }}
+          body: |-
+            Forced sync from home-assistant/core@${{ steps.ha.outputs.HA_SHA }} (branch ${{ steps.ha.outputs.HA_BRANCH }}).
+
+            This update was a forced sync.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -2,8 +2,8 @@ I needed multiple locations for my evohome setup in Home Assistant. This require
 No changes to the integration are made
 
 This repository checks the ha_core daily and:
-- pulls evohome integration 
-- modify it into custom integration
+- pulls evohome integration from the [home assistant latest release](https://github.com/home-assistant/core/releases)
+- [modifies](https://github.com/zxdavb/evohome-async/wiki/Hass:-Multiple-Evohome-Locations) it into custom integration
 - releases new version if changes have been detected
 
 All actions are done by workflow: https://github.com/madcowGit/evohome_cc1/blob/main/.github/workflows/run-on-ha-core-update.yml

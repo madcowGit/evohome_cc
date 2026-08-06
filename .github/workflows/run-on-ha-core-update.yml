@@ -3,7 +3,7 @@ name: Sync evohome from HA Core
 on:
   workflow_dispatch:
   schedule:
-    - cron: "17 3 * * *" # Daily at 03:17 UTC (adjust as you prefer)
+    - cron: "17 */4 * * *" # Daily at 03:17 UTC (adjust as you prefer)
 
 permissions:
   contents: write

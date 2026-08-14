@@ -13,7 +13,7 @@
   "name": "evohome_cc1 (custom_component)",
   "quality_scale": "legacy",
   "requirements": [
-    "evohome-async==2.0.1"
+    "evohome-async==2.1.0"
   ],
   "version": "0.0.1"
 }
